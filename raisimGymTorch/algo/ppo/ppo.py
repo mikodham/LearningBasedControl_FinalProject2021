@@ -83,10 +83,12 @@ class PPO:
         # Learning step
         self.storage.compute_returns(last_values.to(self.device), self.gamma, self.lam)
         mean_value_loss, mean_surrogate_loss, infos = self._train_step()
-        self.storage.clear()
 
         if log_this_iteration:
             self.log({**locals(), **infos, 'it': update})
+
+        self.storage.clear()
+
 
     def log(self, variables, width=80, pad=28):
         self.tot_timesteps += self.num_transitions_per_env * self.num_envs
@@ -94,6 +96,7 @@ class PPO:
 
         self.writer.add_scalar('Loss/value_function', variables['mean_value_loss'], variables['it'])
         self.writer.add_scalar('Loss/surrogate', variables['mean_surrogate_loss'], variables['it'])
+        self.writer.add_scalar('Loss/average_rewards', torch.mean(self.storage.rewards).detach(), variables['it'])
         self.writer.add_scalar('Policy/mean_noise_std', mean_std.item(), variables['it'])
 
     def _train_step(self):
