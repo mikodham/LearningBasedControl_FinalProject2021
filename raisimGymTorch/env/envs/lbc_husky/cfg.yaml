@@ -3,7 +3,6 @@ record_video: yes
 
 environment:
   render: yes
-# just testing commenting
   num_envs: 200
   eval_every_n: 200
   num_threads: 30

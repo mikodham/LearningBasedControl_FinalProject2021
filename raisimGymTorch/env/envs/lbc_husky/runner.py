@@ -44,7 +44,8 @@ act_dim = env.num_acts
 
 # Training
 n_steps = math.floor(cfg['environment']['max_time'] / cfg['environment']['control_dt'])
-total_steps = n_steps * env.num_envs
+total_iteration_steps = n_steps * env.num_envs
+total_steps = 0
 
 avg_rewards = []
 
@@ -79,6 +80,7 @@ for update in range(1000000):
     env.reset()
     reward_sum = 0
     done_sum = 0
+    completed_sum = 0
     average_dones = 0.
 
     if update % cfg['environment']['eval_every_n'] == 0:
@@ -96,11 +98,11 @@ for update in range(1000000):
         env.turn_on_visualization()
         env.start_video_recording(datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S") + "policy_"+str(update)+'.mp4')
 
-        for step in range(n_steps*2):
+        for step in range(n_steps):
             frame_start = time.time()
             obs = env.observe(False)
             action = loaded_graph.architecture(torch.from_numpy(obs).cpu())
-            reward, dones = env.step(action.cpu().detach().numpy())
+            reward, dones, completed = env.step(action.cpu().detach().numpy())
             frame_end = time.time()
             wait_time = cfg['environment']['control_dt'] - (frame_end-frame_start)
             if wait_time > 0.:
@@ -116,16 +118,22 @@ for update in range(1000000):
     for step in range(n_steps):
         obs = env.observe()
         action = ppo.observe(obs)
-        reward, dones = env.step(action)
+        reward, dones, not_completed = env.step(action)
         ppo.step(value_obs=obs, rews=reward, dones=dones)
         done_sum = done_sum + sum(dones)
         reward_sum = reward_sum + sum(reward)
+        completed_sum = completed_sum + sum(not_completed)
+
+    # data constraints - DO NOT CHANGE THIS BLOCK
+    total_steps += env.num_envs * n_steps
+    if total_steps > 20000000:
+        break
 
     # take st step to get value obs
     obs = env.observe()
     ppo.update(actor_obs=obs, value_obs=obs, log_this_iteration=update % 10 == 0, update=update)
-    average_performance = reward_sum / total_steps
-    average_dones = done_sum / total_steps
+    average_performance = reward_sum / total_iteration_steps
+    average_dones = done_sum / total_iteration_steps
     avg_rewards.append(average_performance)
 
     # curriculum update. Implement it in Environment.hpp
@@ -135,11 +143,11 @@ for update in range(1000000):
 
     print('----------------------------------------------------')
     print('{:>6}th iteration'.format(update))
-    print('{:<40} {:>6}'.format("average reward: ", '{:0.10f}'.format(average_performance)))
-    print('{:<40} {:>6}'.format("dones: ", '{:0.6f}'.format(average_dones)))
+    print('{:<40} {:>6}'.format("avg reward: ", '{:0.10f}'.format(average_performance)))
+    print('{:<40} {:>6}'.format("avg completion time: ", '{:0.6f}'.format(completed_sum / env.num_envs * cfg['environment']['control_dt'])))
     print('{:<40} {:>6}'.format("time elapsed in this iteration: ", '{:6.4f}'.format(end - start)))
-    print('{:<40} {:>6}'.format("fps: ", '{:6.0f}'.format(total_steps / (end - start))))
-    print('{:<40} {:>6}'.format("real time factor: ", '{:6.0f}'.format(total_steps / (end - start)
+    print('{:<40} {:>6}'.format("fps: ", '{:6.0f}'.format(total_iteration_steps / (end - start))))
+    print('{:<40} {:>6}'.format("real time factor: ", '{:6.0f}'.format(total_iteration_steps / (end - start)
                                                                        * cfg['environment']['control_dt'])))
     print('std: ')
     print(np.exp(actor.distribution.std.cpu().detach().numpy()))

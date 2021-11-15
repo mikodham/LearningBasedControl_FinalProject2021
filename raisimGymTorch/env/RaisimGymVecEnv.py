@@ -22,6 +22,7 @@ class RaisimGymVecEnv:
         self._observation = np.zeros([self.num_envs, self.num_obs], dtype=np.float32)
         self.obs_rms = RunningMeanStd(shape=[self.num_envs, self.num_obs])
         self._reward = np.zeros(self.num_envs, dtype=np.float32)
+        self._not_completed = np.zeros(self.num_envs, dtype=np.float32)
         self._done = np.zeros(self.num_envs, dtype=np.bool)
         self.rewards = [[] for _ in range(self.num_envs)]
 
@@ -41,8 +42,8 @@ class RaisimGymVecEnv:
         self.wrapper.stopRecordingVideo()
 
     def step(self, action):
-        self.wrapper.step(action, self._reward, self._done)
-        return self._reward.copy(), self._done.copy()
+        self.wrapper.step(action, self._reward, self._done, self._not_completed)
+        return self._reward.copy(), self._done.copy(), self._not_completed
 
     def load_scaling(self, dir_name, iteration, count=1e5):
         mean_file_name = dir_name + "/mean" + str(iteration) + ".csv"

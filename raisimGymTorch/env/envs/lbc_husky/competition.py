@@ -17,20 +17,19 @@ args = parser.parse_args()
 # directories
 task_path = os.path.dirname(os.path.realpath(__file__))
 home_path = task_path + "/../../../.."
+weight_path = home_path + "/raisimGymTorch/data/husky_navigation/2021-11-15-11-10-34/full_4200.pt"
 
 # config
 cfg = YAML().load(open(task_path + "/cfg.yaml", 'r'))
 
 # create environment from the configuration file
-cfg['environment']['num_envs'] = 1
-
+cfg['environment']['num_envs'] = 200
 env = VecEnv(lbc_husky.RaisimGymEnv(home_path + "/rsc", dump(cfg['environment'], Dumper=RoundTripDumper)), cfg['environment'])
 
 # shortcuts
 ob_dim = env.num_obs
 act_dim = env.num_acts
 
-weight_path = args.weight
 iteration_number = weight_path.rsplit('/', 1)[1].split('_', 1)[1].rsplit('.', 1)[0]
 weight_dir = weight_path.rsplit('/', 1)[0] + '/'
 
@@ -40,7 +39,7 @@ else:
     print("Loaded weight from {}\n".format(weight_path))
     start = time.time()
     env.reset()
-    reward_sum = 0
+    completion_sum = 0
     done_sum = 0
     average_dones = 0.
     n_steps = math.floor(cfg['environment']['max_time'] / cfg['environment']['control_dt'])
@@ -54,23 +53,18 @@ else:
     env.load_scaling(weight_dir, int(iteration_number))
     env.turn_on_visualization()
 
-    # max_steps = 1000000
-    max_steps = 100 ## 10 secs
+    max_steps = 80 ## 8 secs
+    completed_sum = 0
 
-    for step in range(20):
-        for step in range(max_steps):
-            time.sleep(cfg['environment']['control_dt'])
-            obs = env.observe(False)
-            action = loaded_graph.architecture(torch.from_numpy(obs).cpu())
-            reward, dones = env.step(action.cpu().detach().numpy())
-            reward_sum = reward_sum + reward[0]
-            if dones or step == max_steps - 1:
-                print('----------------------------------------------------')
-                print('{:<40} {:>6}'.format("average reward: ", '{:0.10f}'.format(reward_sum / (step))))
-                print('{:<40} {:>6}'.format("time elapsed [sec]: ", '{:6.4f}'.format((step) * 0.01)))
-                print('----------------------------------------------------\n')
-                reward_sum = 0.0
-        env.reset()
+    for step in range(max_steps):
+        time.sleep(cfg['environment']['control_dt'])
+        obs = env.observe(False)
+        action = loaded_graph.architecture(torch.from_numpy(obs).cpu())
+        reward, dones, not_completed = env.step(action.cpu().detach().numpy())
+        completed_sum = completed_sum + sum(not_completed)
+
+    print('----------------------------------------------------')
+    print('{:<40} {:>6}'.format("avg completion time: ", '{:0.6f}'.format(completed_sum / env.num_envs * cfg['environment']['control_dt'])))
+    print('----------------------------------------------------\n')
 
     env.turn_off_visualization()
-    print("Finished at the maximum visualization steps")

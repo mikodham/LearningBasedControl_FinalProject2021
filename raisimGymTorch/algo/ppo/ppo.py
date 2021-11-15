@@ -120,8 +120,8 @@ class PPO:
                 if self.use_clipped_value_loss:
                     value_clipped = current_values_batch + (value_batch - current_values_batch).clamp(-self.clip_param,
                                                                                                     self.clip_param)
-                    value_losses = (value_batch - returns_batch).pow(2)
                     value_losses_clipped = (value_clipped - returns_batch).pow(2)
+                    value_losses = (value_batch - returns_batch).pow(2)
                     value_loss = torch.max(value_losses, value_losses_clipped).mean()
                 else:
                     value_loss = (returns_batch - value_batch).pow(2).mean()

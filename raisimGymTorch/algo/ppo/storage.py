@@ -46,10 +46,8 @@ class RolloutStorage:
         for step in reversed(range(self.num_transitions_per_env)):
             if step == self.num_transitions_per_env - 1:
                 next_values = last_values
-                # next_is_not_terminal = 1.0 - self.dones[step].float()
             else:
                 next_values = self.values[step + 1]
-                # next_is_not_terminal = 1.0 - self.dones[step+1].float()
 
             next_is_not_terminal = 1.0 - self.dones[step].float()
             delta = self.rewards[step] + next_is_not_terminal * gamma * next_values - self.values[step]

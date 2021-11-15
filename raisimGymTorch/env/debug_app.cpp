@@ -1,8 +1,3 @@
-//----------------------------//
-// This file is part of RaiSim//
-// Copyright 2020, RaiSim Tech//
-//----------------------------//
-
 #include "Environment.hpp"
 #include "VectorizedEnvironment.hpp"
 
@@ -40,15 +35,16 @@ int main(int argc, char *argv[]) {
   EigenRowMajorMat observation(config["num_envs"].template As<int>(), vecEnv.getObDim());
   EigenRowMajorMat action(config["num_envs"].template As<int>(), vecEnv.getActionDim());
   EigenVec reward(config["num_envs"].template As<int>(), 1);
+  EigenVec complete(config["num_envs"].template As<int>(), 1);
   EigenBoolVec dones(config["num_envs"].template As<int>(), 1);
   action.setZero();
 
   Eigen::Ref<EigenRowMajorMat> ob_ref(observation), action_ref(action);
-  Eigen::Ref<EigenVec> reward_ref(reward);
+  Eigen::Ref<EigenVec> reward_ref(reward), complete_ref(complete);
   Eigen::Ref<EigenBoolVec> dones_ref(dones);
 
   vecEnv.reset();
-  vecEnv.step(action_ref, reward_ref, dones_ref);
+  vecEnv.step(action_ref, reward_ref, dones_ref, complete_ref);
 
   return 0;
 }
