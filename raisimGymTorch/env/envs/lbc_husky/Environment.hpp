@@ -8,7 +8,7 @@
 ///       w,x,y,z quaternion
 ///       w1,w2,w3,w4 wheel angles
 
-/// gw_ = x,y,z linear velocities
+/// gv_ = x,y,z linear velocities
 ///       w_x,w_y,w_z angular velocities in the world frame
 ///       s1,s2,s3,s4 wheel speed
 
