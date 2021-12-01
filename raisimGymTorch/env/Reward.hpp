@@ -49,7 +49,7 @@ class Reward {
     rewards_[name].integral += rewards_[name].reward;
   }
 
-  float sum() {
+  float sum() { // iterate of reward variables, sum it, when you do training, it only cares about the sum
     float sum = 0.f;
     for(auto& rw: rewards_)
       sum += rw.second.reward;

@@ -50,9 +50,9 @@ class RaisimGymVecEnv:
         var_file_name = dir_name + "/var" + str(iteration) + ".csv"
         self.obs_rms.count = count
         self.obs_rms.mean[:,None] = np.loadtxt(mean_file_name, dtype=np.float32)
-        self.obs_rms.var[:,None] = np.loadtxt(var_file_name, dtype=np.float32)
+        self.obs_rms.var[:,None] = np.loadtxt(var_file_name, dtype=np.float32)  # only to one column
 
-    def save_scaling(self, dir_name, iteration):
+    def save_scaling(self, dir_name, iteration):  # only save one column of that scaling observation
         mean_file_name = dir_name + "/mean" + iteration + ".csv"
         var_file_name = dir_name + "/var" + iteration + ".csv"
         np.savetxt(mean_file_name, self.obs_rms.mean[0,:])
@@ -64,6 +64,7 @@ class RaisimGymVecEnv:
         if self.normalize_ob:
             if update_mean:
                 self.obs_rms.update(self._observation)
+                # obs_rms is running mean stddev, scales down observation, add it to NN
 
             return self._normalize_observation(self._observation)
         else:

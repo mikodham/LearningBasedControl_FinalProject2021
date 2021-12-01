@@ -40,23 +40,27 @@ class RolloutStorage:
     def clear(self):
         self.step = 0
 
-    def compute_returns(self, last_values, gamma, lam):
+    def compute_returns(self, last_values, gamma, lam):  # calculate GAE and TD-lambda, compute returns and advantages
         advantage = 0
 
-        for step in reversed(range(self.num_transitions_per_env)):
-            if step == self.num_transitions_per_env - 1:
+        for step in reversed(range(self.num_transitions_per_env)):  # iterating last to first, going back in time
+            if step == self.num_transitions_per_env - 1: # only use it if it is the terminal state!
                 next_values = last_values
             else:
                 next_values = self.values[step + 1]
 
-            next_is_not_terminal = 1.0 - self.dones[step].float()
-            delta = self.rewards[step] + next_is_not_terminal * gamma * next_values - self.values[step]
-            advantage = (delta + next_is_not_terminal * gamma * lam * advantage)
-            self.returns[step] = advantage + self.values[step]
+            next_is_not_terminal = 1.0 - self.dones[step].float()  # 1 if it is not terminal, convert to float, for network
+            delta = self.rewards[step] + next_is_not_terminal * gamma * next_values - self.values[step] # TD-error=R+gamma*(vst+1-vs)
+            advantage = (delta + next_is_not_terminal * gamma * lam * advantage) # advamtage = TD+ gamma*lam*previous advantage (See GAE Paper)
+            self.returns[step] = advantage + self.values[step]  # we learn the value as well
 
         # Compute and normalize the advantages
         self.advantages = self.returns - self.values
         self.advantages = (self.advantages - self.advantages.mean()) / (self.advantages.std() + 1e-8)
+        # the scale of advantage shouldnt matter, in the end we are maximizing it. so we give an offset
+        # max f(x) => max f(x)+10, we can scale+offset
+        # so we scale it s.t. we have std deviation and mean, 1+e-8, to make sure no divided by zero
+        # you dont want the scale of advantage affects the training => learns much better
 
     def mini_batch_generator_shuffle(self, num_mini_batches):
         batch_size = self.num_envs * self.num_transitions_per_env

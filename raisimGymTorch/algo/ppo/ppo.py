@@ -78,11 +78,15 @@ class PPO:
                                      self.actions_log_prob)
 
     def update(self, actor_obs, value_obs, log_this_iteration, update):
-        last_values = self.critic.predict(torch.from_numpy(value_obs).to(self.device))
+        last_values = self.critic.predict(torch.from_numpy(value_obs).to(self.device)) # return expected value of last steo
+        # last observation is not used, we didnt compute the value for the last observation
+        # critic evaluates, value, you compute the value pass it to storage? why? for TD lambda and GAE, we need a value function
+        # need to evaluate predicted value from value network to compute lower variance estimates, then compute returns
 
         # Learning step
-        self.storage.compute_returns(last_values.to(self.device), self.gamma, self.lam)
+        self.storage.compute_returns(last_values.to(self.device), self.gamma, self.lam) # compute TD-lambda and GAE
         mean_value_loss, mean_surrogate_loss, infos = self._train_step()
+        # doing the real training on value function and policy function network
 
         if log_this_iteration:
             self.log({**locals(), **infos, 'it': update})
@@ -90,7 +94,7 @@ class PPO:
         self.storage.clear()
 
 
-    def log(self, variables, width=80, pad=28):
+    def log(self, variables, width=80, pad=28): #log data to tensorf board
         self.tot_timesteps += self.num_transitions_per_env * self.num_envs
         mean_std = self.actor.distribution.std.mean()
 
@@ -102,35 +106,53 @@ class PPO:
     def _train_step(self):
         mean_value_loss = 0
         mean_surrogate_loss = 0
-        for epoch in range(self.num_learning_epochs):
+        for epoch in range(self.num_learning_epochs):  # for multiple updates PPO, so in this case 4 epochs in runner.py
+            # 1 epoch = one sweep of your dataset, which is split into min_batches defined in runner.py,
+            # NN is highly non-linear, if you take multiple steps, mitigate non linearity in NN
+            # still it will not help with non-linearities (approximation mu prime to mu in PPO, which is valid up to first order)
+            # of the policy gradient,
+            # if we keep learning speed, decreasing epoch => increasing learning rate, but it ignores the epoch is non-linear
+            # so better if we apply smaller step
             for actor_obs_batch, critic_obs_batch, actions_batch, current_values_batch, advantages_batch, returns_batch, old_actions_log_prob_batch \
-                    in self.batch_sampler(self.num_mini_batches):
-
-                actions_log_prob_batch, entropy_batch = self.actor.evaluate(actor_obs_batch, actions_batch)
+                    in self.batch_sampler(self.num_mini_batches):  # do the training/compute surrogate loss, for each epoch, each training/epoch, each minibatch
+                # See PPO Lecture! actual PPO training
+                actions_log_prob_batch, entropy_batch = self.actor.evaluate(actor_obs_batch, actions_batch) # input actual action we took
+                # output = the log probability of taking that action, entropy of the stochastic policy
                 value_batch = self.critic.evaluate(critic_obs_batch)
+                # actions_log_prob_batch and value_batch is NOT a number, it is a mathematical expression,
+                # like an equation which uses the active parameters, policy parameters.
+                # so we can take the derivative of expression
 
                 # Surrogate loss
                 ratio = torch.exp(actions_log_prob_batch - torch.squeeze(old_actions_log_prob_batch))
-                surrogate = -torch.squeeze(advantages_batch) * ratio
+                # importance sampling ratio. old_actions_log_prob_batch is just a number. e^(ln(a)-ln(b)= a/b
+                surrogate = -torch.squeeze(advantages_batch) * ratio # rt * At, see LCPI(theta) PPO paper
+                # we put negative, pytorch formulate minimization problem, convention
                 surrogate_clipped = -torch.squeeze(advantages_batch) * torch.clamp(ratio, 1.0 - self.clip_param,
                                                                                    1.0 + self.clip_param)
-                surrogate_loss = torch.max(surrogate, surrogate_clipped).mean()
+                # clamp is CLIP function
+                surrogate_loss = torch.max(surrogate, surrogate_clipped).mean() # max because we put negative
 
                 # Value function loss
-                if self.use_clipped_value_loss:
+                if self.use_clipped_value_loss: # see PPO Lecture, #7 value function! not in PPO
                     value_clipped = current_values_batch + (value_batch - current_values_batch).clamp(-self.clip_param,
                                                                                                     self.clip_param)
-                    value_losses_clipped = (value_clipped - returns_batch).pow(2)
-                    value_losses = (value_batch - returns_batch).pow(2)
-                    value_loss = torch.max(value_losses, value_losses_clipped).mean()
+                    value_losses_clipped = (value_clipped - returns_batch).pow(2) # LVF_Clip
+                    value_losses = (value_batch - returns_batch).pow(2) # this is exactly MC, LVF
+                    value_loss = torch.max(value_losses, value_losses_clipped).mean() # LVF
                 else:
                     value_loss = (returns_batch - value_batch).pow(2).mean()
 
                 loss = surrogate_loss + self.value_loss_coef * value_loss - self.entropy_coef * entropy_batch.mean()
+                # balance between value learning and policy learning, negative entropy coef, want to maximize the entropy
+                # surrogate loss, value loss, entropy batch, are expressions! not numbers! => hence can take derivative
+                # surrogate loss and entropy batch depends on theta, value loss depends on w
+                # when we run optimizer.step, surrogate loss and entropy loss is not gonna affect value func
+                # value lossi is not gonna affect policy func
 
                 # Gradient step
                 self.optimizer.zero_grad()
-                loss.backward()
+                loss.backward()  # compute gradient of loss w.r.t of actor and critic parameters
                 nn.utils.clip_grad_norm_([*self.actor.parameters(), *self.critic.parameters()], self.max_grad_norm)
                 self.optimizer.step()
 

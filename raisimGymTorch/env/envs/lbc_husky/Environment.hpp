@@ -31,6 +31,7 @@ class ENVIRONMENT : public RaisimGymEnv {
     husky_ = world_->addArticulatedSystem(resourceDir_ + "/husky/husky.urdf");
     husky_->setName("husky");
     husky_->setControlMode(raisim::ControlMode::FORCE_AND_TORQUE);
+    //EXP: where you define the robot, definitions of robot is provided in this urdf
 
     /// add heightmap
     raisim::TerrainProperties terrainProperties;
@@ -74,9 +75,14 @@ class ENVIRONMENT : public RaisimGymEnv {
     gv_init_.setZero(gvDim_);
     genForce_.setZero(gvDim_);
     torque4_.setZero(nJoints_);
+      // to define configuration robot, position using generalized coordinate gc, velocity using generalized velocity gv
+      // to describe states. Generalized coordinate ->  floating base system
+      // floating based system: define where the robot is / configuration of robot
+      // define 3d position of base (expressed in 3d vector), orientation of base(quaternion), and angle of the four wheels(angles)
 
     /// this is nominal configuration of anymal
     gc_init_ << 0, 0, 0.50, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0;
+    // x,y,z, cortonian(4) rotation, 4 wheel angles => 11DOF
 
     /// MUST BE DONE FOR ALL ENVIRONMENTS
     obDim_ = 17 + SCANSIZE;
@@ -137,7 +143,25 @@ class ENVIRONMENT : public RaisimGymEnv {
     }
 
     updateObservation();
-    rewards_.record("goal", gc_.head<2>().norm());
+    rewards_.record("goal", gc_.head<2>().norm()); // further displacement from world frame, negative reward
+    // if it has moved very close, increase much more?
+    rewards_.record("height", gc_.segment(3,1).norm() * (1. -currfac_height)); //initially don't penaltize heigh
+    // it would be better if we add relu of height because
+      // Matrix<T,Dynamic,Dynamic,0,MaxRows,MaxCols> Eigen::EigenBase<Eigen::Matrix<double, -1, 1, 0, -1, 1> >
+    rewards_.record("velocity", gv_.head<2>().norm() * (currfac_velocity) ); //velocity, positive reward, *(1. -currfac_velocity)
+    rewards_.record("angular", gv_.tail<4>().norm() *(currfac_velocity)); //NEXT multiply by 9.5
+    //angular velocity must be somewhat close, they must be in the same direction, cosine similarity
+//    rewards_.record("falling_husky", gc_); //penalize husky HEAVILY if it the car is flipped, imu joint
+//  ADD LIDAR,
+
+
+//    std::cout << "GC DISTANCE " << gc_.head<2>().norm() << "\n GC HEIGHT "<< gc_(3) << "\n GC VEL "<< gv_.head<2>().norm();
+    // generalized coordinate (x,y), norm = projected distance
+    // if you are far away, high rewards * negative in cfg.yaml
+    // you have to drive the wheels s.t. the robot goes to the world position
+
+    // for curriculum factor
+//    rewards.record("goal", gc_.head<2>().norm() * (1. - currfac_distance));
     return rewards_.sum();
   }
 
@@ -187,8 +211,10 @@ class ENVIRONMENT : public RaisimGymEnv {
       return 1.f;
   }
 
-  void curriculumUpdate() {
-
+  void curriculumUpdate() { //IMPLEMENT THIS
+//    currfac_distance *= 0.995;
+    currfac_height *= 0.9;
+    currfac_velocity *= 0.995;
   };
 
  private:
@@ -202,6 +228,9 @@ class ENVIRONMENT : public RaisimGymEnv {
   int SCANSIZE = 20;
   int GRIDSIZE = 6;
   std::vector<raisim::Visuals *> scans;  // for visualization
+//  double currfac_distance = 1;
+  double currfac_velocity = 1;
+  double currfac_height =1;
 
   thread_local static std::mt19937 gen_;
   thread_local static std::normal_distribution<double> normDist_;

@@ -120,8 +120,8 @@ class VectorizedEnvironment {
 
   ////// optional methods //////
   void curriculumUpdate() {
-    for (auto *env: environments_)
-      env->curriculumUpdate();
+    for (auto *env: environments_) //environments_ is a vector holding pointers of all the envs
+      env->curriculumUpdate(); // go to ENvironment.hpp, void curriculumUpdate
   };
 
   const std::vector<std::map<std::string, float>>& getRewardInfo() { return rewardInformation_; }
