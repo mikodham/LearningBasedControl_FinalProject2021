@@ -51,7 +51,7 @@ class ENVIRONMENT : public RaisimGymEnv {
     /// add obstacles
     for (int i = 0; i < 70; i += GRIDSIZE) {
       for (int j = (i % (GRIDSIZE * GRIDSIZE)) * 2 / GRIDSIZE; j < 70; j += GRIDSIZE) {
-        poles_.emplace_back(Eigen::Vector2d{i - 35.0, j - 35.0});
+        poles_.emplace_back(Eigen::Vector2d{1.01449*j - 35.0, 1.01449*i - 35.0});
         heightVec[i*70 + j] += 1.;
       }
     }
