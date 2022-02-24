@@ -11,14 +11,20 @@ environment:
   max_time: 8
   reward:
     goal:
-      coeff: -0.1
+      coeff: 0.1
     velocity:
       coeff: 0.45
     height:
-      coeff: -0.05
+      coeff: 1
     angular:
       coeff: 0.45
+    flip_husky:
+      coeff: -1
+    torque:
+      coeff: 1
+    direction:
+      coeff: 1
 
 architecture:
-  policy_net: [128, 128]
-  value_net: [128, 128]
+  policy_net: [1024, 1024]
+  value_net: [1024, 1024]

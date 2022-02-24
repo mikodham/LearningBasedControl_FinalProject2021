@@ -69,12 +69,13 @@ ppo = PPO.PPO(actor=actor,
               num_envs=cfg['environment']['num_envs'],
               num_transitions_per_env=n_steps,
               num_learning_epochs=4,
-              gamma=0.996,  # discount factor
+              gamma=0.999,  # discount factor initially 0.996
               lam=0.95,  # lambda for GAE
               num_mini_batches=4,
               device=device,
               log_dir=saver.data_dir,
               shuffle_batch=False,
+              entropy_coef=0.005,  # ADD
               )
 
 if mode == 'retrain':
@@ -107,7 +108,7 @@ for update in range(1000000): # START of actual training
         env.turn_on_visualization()
         env.start_video_recording(datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S") + "policy_"+str(update)+'.mp4')
 
-        for step in range(n_steps): # this part is just visualization to see how actor performed and recording, not training
+        for step in range(n_steps):  # this part is just visualization to see how actor performed and recording, not training
             frame_start = time.time()
             obs = env.observe(False)  # get environment, pass it to loaded actor,
             action = loaded_graph.architecture(torch.from_numpy(obs).cpu()) # then input action to the environment
